@@ -24,10 +24,21 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private bool _isStartupEnabledCached;
     private uint _showMeMessage;
 
+    private const int WmQueryEndSession = 0x0011;
+    private const int WmEndSession = 0x0012;
+    private const int WmPowerBroadcast = 0x0218;
+
     public MainWindow()
     {
         InitializeComponent();
-        Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this);
+        try
+        {
+            Wpf.Ui.Appearance.SystemThemeWatcher.Watch(this);
+        }
+        catch
+        {
+            // Ignore system theme watcher errors if OS theme notification fails
+        }
 
         _settingsStore = new SettingsStore();
         _settings = _settingsStore.Load();
@@ -65,6 +76,31 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             ShowSettingsWindow();
             handled = true;
         }
+        else if (msg == WmQueryEndSession)
+        {
+            // Intercept WM_QUERYENDSESSION to prevent WPF's built-in HwndWrapper from calling
+            // CriticalShutdown() (which throws FileNotFoundException in single-file published WPF apps).
+            // Return 1 to notify Windows that this app has no unsaved data, but set handled = true
+            // so WPF internal handlers never receive the message.
+            handled = true;
+            return new IntPtr(1);
+        }
+        else if (msg == WmEndSession)
+        {
+            // Only exit if Windows is actually ending the session (wParam != 0)
+            if (wParam != IntPtr.Zero)
+            {
+                ExitApplication();
+            }
+            handled = true;
+        }
+        else if (msg == WmPowerBroadcast)
+        {
+            // Intercept power status change messages (AC/DC switching, Battery Saver toggle, GPU MUX switches)
+            // so WPF does not handle them as session termination events.
+            handled = true;
+        }
+
         return IntPtr.Zero;
     }
 

@@ -49,6 +49,13 @@ public partial class App : System.Windows.Application
             args.Handled = true;
         };
 
+        SessionEnding += (_, args) =>
+        {
+            // Cancel WPF's built-in CriticalShutdown which crashes in single-file published WPF apps
+            // and causes unintended app exit when laptop power state (AC/DC) changes.
+            args.Cancel = true;
+        };
+
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
             if (args.ExceptionObject is Exception exception)
