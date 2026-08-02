@@ -14,6 +14,16 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        try
+        {
+            Environment.SetEnvironmentVariable("DOTNET_TELEMETRY_OPTOUT", "1");
+            Environment.SetEnvironmentVariable("DOTNET_CLI_TELEMETRY_OPTOUT", "1");
+        }
+        catch
+        {
+            // Ignore environment set failures
+        }
+
         const string mutexName = @"Local\SideTabScroller-SingleInstance-Mutex";
         _mutex = new Mutex(true, mutexName, out bool createdNew);
         _ownsMutex = createdNew;
@@ -37,6 +47,19 @@ public partial class App : System.Windows.Application
         }
 
         base.OnStartup(e);
+
+        const int wmQueryEndSession = 0x0011;
+        const int wmEndSession = 0x0012;
+
+        System.Windows.Interop.ComponentDispatcher.ThreadFilterMessage += (ref System.Windows.Interop.MSG msg, ref bool handled) =>
+        {
+            if (msg.message is wmQueryEndSession or wmEndSession)
+            {
+                // Suppress WM_QUERYENDSESSION and WM_ENDSESSION from reaching WPF's internal HwndApp/AppFilterMessage
+                // to prevent CriticalShutdown and telemetry crashes in single-file WPF apps on deep sleep / hibernate.
+                handled = true;
+            }
+        };
 
         DispatcherUnhandledException += (_, args) =>
         {

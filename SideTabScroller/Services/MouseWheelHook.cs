@@ -37,7 +37,7 @@ internal sealed class MouseWheelHook : IDisposable
         }
     }
 
-    public void Dispose()
+    public void Stop()
     {
         if (_hookHandle != IntPtr.Zero)
         {
@@ -46,6 +46,17 @@ internal sealed class MouseWheelHook : IDisposable
         }
 
         _callback = null;
+    }
+
+    public void Restart()
+    {
+        Stop();
+        Start();
+    }
+
+    public void Dispose()
+    {
+        Stop();
     }
 
     private IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)

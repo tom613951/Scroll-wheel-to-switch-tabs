@@ -27,6 +27,8 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private const int WmQueryEndSession = 0x0011;
     private const int WmEndSession = 0x0012;
     private const int WmPowerBroadcast = 0x0218;
+    private const int PbtApmResumeAutomatic = 0x0012;
+    private const int PbtApmResumeSuspend = 0x0007;
 
     public MainWindow()
     {
@@ -87,15 +89,28 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
         else if (msg == WmEndSession)
         {
-            // Only exit if Windows is actually ending the session (wParam != 0)
-            if (wParam != IntPtr.Zero)
-            {
-                ExitApplication();
-            }
+            // Do not call ExitApplication() here. Windows OS will terminate background processes automatically
+            // if the system is shutting down or logging off. However, during Deep Sleep / Hibernate / Hybrid Sleep,
+            // Windows sends WM_ENDSESSION to save session state. Calling ExitApplication() would kill the background process.
             handled = true;
+            return IntPtr.Zero;
         }
         else if (msg == WmPowerBroadcast)
         {
+            var powerEvent = wParam.ToInt32();
+            if (powerEvent is PbtApmResumeAutomatic or PbtApmResumeSuspend)
+            {
+                // Refresh low-level mouse hook on system resume from sleep/hibernate
+                try
+                {
+                    _mouseWheelHook.Restart();
+                }
+                catch
+                {
+                    // Non-critical failure
+                }
+            }
+
             // Intercept power status change messages (AC/DC switching, Battery Saver toggle, GPU MUX switches)
             // so WPF does not handle them as session termination events.
             handled = true;
